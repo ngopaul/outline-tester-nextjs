@@ -184,10 +184,12 @@ export class OccludedOutline {
     for (let i = 0; i < this.outline.length - 2; i++) {
       if ((this.outline[i] instanceof Occlusion) &&
           this.outline[i+1] === " " &&
-          (this.outline[i+2] instanceof Occlusion) &&
-          this.outline[i].use_as_blank &&
-          this.outline[i+2].use_as_blank) {
-        return true;
+          (this.outline[i+2] instanceof Occlusion)) {
+        const firstOcclusion = this.outline[i] as Occlusion;
+        const secondOcclusion = this.outline[i+2] as Occlusion;
+        if (firstOcclusion.use_as_blank && secondOcclusion.use_as_blank) {
+          return true;
+        }
       }
     }
     return false;
@@ -203,16 +205,17 @@ export class OccludedOutline {
         const c = this.outline[i+2];
         if ((a instanceof Occlusion) && 
             b === " " &&
-            (c instanceof Occlusion) &&
-            a.use_as_blank && c.use_as_blank) {
-          new_outline.push(
-            new Occlusion(a.answer + " " + c.answer, "")
-          );
-          i += 3;
-        } else {
-          new_outline.push(this.outline[i]);
-          i++;
+            (c instanceof Occlusion)) {
+          const firstOcclusion = a as Occlusion;
+          const secondOcclusion = c as Occlusion;
+          if (firstOcclusion.use_as_blank && secondOcclusion.use_as_blank) {
+            new_outline.push(new Occlusion(a.answer + " " + c.answer, ""));
+            i += 3;
+            continue;
+          }
         }
+        new_outline.push(this.outline[i]);
+        i++;
       }
       while (i < this.outline.length) {
         new_outline.push(this.outline[i]);
