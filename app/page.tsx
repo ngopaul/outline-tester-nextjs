@@ -1,101 +1,148 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import OutlineSelector from '../components/OutlineSelector';
+import OutlineEditor from '../components/OutlineEditor';
+import OutlineTester from '../components/OutlineTester';
+import { generate_initial_outline } from '../lib/occlusionLogic';
+
+interface OutlineData {
+  title: string;
+  text: string;
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [mode, setMode] = useState<"select" | "test" | "results">("select");
+  const [currentOutlineObj, setCurrentOutlineObj] = useState<{
+    outline: any[];
+    dropout_rate: number;
+  } | null>(null);
+  const [results, setResults] = useState<{
+    num_blanks: number;
+    num_attempts: number;
+    num_skipped: number;
+    num_hints: number;
+    suggestedDifficulty: number;
+  } | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [combinedOutlines, setCombinedOutlines] = useState<string[]>([]);
+  const [wordMapping, setWordMapping] = useState<Record<string, number>>({});
+
+  // Load public outlines and local outlines
+  function refreshOutlines() {
+    Promise.all([
+      fetch('/outlines/outlines.json').then(r => r.json()),
+    ]).then(([publicOutlines]) => {
+      const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
+      const localTitles = stored.map(o => o.title);
+      // Combine public and local outlines
+      const combined = [...publicOutlines, ...localTitles];
+      setCombinedOutlines(combined);
+    }).catch(() => {
+      const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
+      const localTitles = stored.map(o => o.title);
+      setCombinedOutlines(localTitles); // fallback to local only if fetch fails
+    });
+  }
+
+  useEffect(() => {
+    refreshOutlines();
+    // Load 1000words.txt and create mapping
+    fetch('/outlines/1000words.txt')
+      .then(r => r.text())
+      .then(text => {
+        const words = text.split('\n').map(w => w.trim()).filter(w => w);
+        // Create a frequency mapping like original code
+        // The code used a denominator trick:
+        // For each word, assign a numeric value representing its frequency rank
+        let denom = 2;
+        let mapping: Record<string, number> = {};
+        for (let w of words) {
+          mapping[w.toLowerCase()] = 1/denom;
+          denom += 0.2;
+        }
+        setWordMapping(mapping);
+      });
+  }, []);
+
+  function handleSelect(outlineName: string, difficulty: number) {
+    // First check if outlineName is in publicOutlines or local
+    fetchOutlineText(outlineName).then(found => {
+      if (!found) {
+        alert("Outline not found");
+        return;
+      }
+      const out = generate_initial_outline(found, difficulty / 10.0, wordMapping);
+      (out as any).dropout_rate = difficulty / 10.0; 
+      setCurrentOutlineObj(out as any);
+      setMode("test");
+    });
+  }
+
+  async function fetchOutlineText(outlineName: string): Promise<string|null> {
+    // Check if it's a public file (ends with .txt)
+    if (outlineName.endsWith('.txt')) {
+      // Public outline
+      const res = await fetch(`/outlines/${outlineName}`);
+      if (res.ok) {
+        return await res.text();
+      }
+      return null;
+    } else {
+      // Local outline
+      const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
+      const found = stored.find(o => o.title === outlineName);
+      return found ? found.text : null;
+    }
+  }
+
+  function handleDone(title: string) {
+    // After adding/editing, refresh outlines
+    refreshOutlines();
+  }
+
+  function handleTestFinish(data: {
+    num_blanks: number;
+    num_attempts: number;
+    num_skipped: number;
+    num_hints: number;
+    suggestedDifficulty: number;
+  }) {
+    setResults(data);
+    setMode("results");
+  }
+
+  function handleQuit() {
+    setMode("select");
+    setCurrentOutlineObj(null);
+  }
+
+  return (
+    <div className="p-4 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Outline Memorization Tool</h1>
+      {mode === "select" && (
+        <div>
+          <OutlineSelector onSelect={handleSelect} outlines={combinedOutlines} />
+          <OutlineEditor onDone={handleDone} refreshOutlines={refreshOutlines} />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+      {mode === "test" && currentOutlineObj && (
+        <OutlineTester outlineObj={currentOutlineObj} onDone={handleTestFinish} onQuit={handleQuit} />
+      )}
+      {mode === "results" && results && (
+        <div className="border p-4 rounded bg-gray-50 mt-4">
+          <h3 className="font-bold mb-2">Results</h3>
+          <p>Filled {results.num_blanks} blanks.</p>
+          <p>Finished in {results.num_attempts} attempts, with {results.num_skipped} skipped, and {results.num_hints} hints.</p>
+          <p>Suggested new difficulty: {results.suggestedDifficulty}</p>
+          <button 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+            onClick={() => setMode("select")}
+          >
+            Back to selection
+          </button>
+        </div>
+      )}
     </div>
   );
 }
