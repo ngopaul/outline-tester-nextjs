@@ -3,20 +3,22 @@
 import React, { useState, useEffect } from 'react';
 import OutlineSelector from '../components/OutlineSelector';
 import OutlineEditor from '../components/OutlineEditor';
+import { generate_initial_outline, OccludedOutline, calculate_new_dropout_rate } from '../lib/occlusionLogic';
 import OutlineTester from '../components/OutlineTester';
-import { generate_initial_outline } from '../lib/occlusionLogic';
 
 interface OutlineData {
   title: string;
   text: string;
 }
 
+interface OutlineWithRate {
+  outline: (string | ReturnType<typeof OccludedOutline.prototype.parseOutline>[number])[];
+  dropout_rate: number;
+}
+
 export default function Home() {
   const [mode, setMode] = useState<"select" | "test" | "results">("select");
-  const [currentOutlineObj, setCurrentOutlineObj] = useState<{
-    outline: any[];
-    dropout_rate: number;
-  } | null>(null);
+  const [currentOutlineObj, setCurrentOutlineObj] = useState<OutlineWithRate | null>(null);
   const [results, setResults] = useState<{
     num_blanks: number;
     num_attempts: number;
@@ -28,20 +30,18 @@ export default function Home() {
   const [combinedOutlines, setCombinedOutlines] = useState<string[]>([]);
   const [wordMapping, setWordMapping] = useState<Record<string, number>>({});
 
-  // Load public outlines and local outlines
   function refreshOutlines() {
     Promise.all([
       fetch('/outlines/outlines.json').then(r => r.json()),
     ]).then(([publicOutlines]) => {
       const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
       const localTitles = stored.map(o => o.title);
-      // Combine public and local outlines
       const combined = [...publicOutlines, ...localTitles];
       setCombinedOutlines(combined);
     }).catch(() => {
       const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
       const localTitles = stored.map(o => o.title);
-      setCombinedOutlines(localTitles); // fallback to local only if fetch fails
+      setCombinedOutlines(localTitles);
     });
   }
 
@@ -52,12 +52,9 @@ export default function Home() {
       .then(r => r.text())
       .then(text => {
         const words = text.split('\n').map(w => w.trim()).filter(w => w);
-        // Create a frequency mapping like original code
-        // The code used a denominator trick:
-        // For each word, assign a numeric value representing its frequency rank
+        const mapping: Record<string, number> = {};
         let denom = 2;
-        let mapping: Record<string, number> = {};
-        for (let w of words) {
+        for (const w of words) {
           mapping[w.toLowerCase()] = 1/denom;
           denom += 0.2;
         }
@@ -65,38 +62,36 @@ export default function Home() {
       });
   }, []);
 
-  function handleSelect(outlineName: string, difficulty: number) {
-    // First check if outlineName is in publicOutlines or local
-    fetchOutlineText(outlineName).then(found => {
-      if (!found) {
-        alert("Outline not found");
-        return;
-      }
-      const out = generate_initial_outline(found, difficulty / 10.0, wordMapping);
-      (out as any).dropout_rate = difficulty / 10.0; 
-      setCurrentOutlineObj(out as any);
-      setMode("test");
-    });
+  async function handleSelect(outlineName: string, difficulty: number) {
+    const found = await fetchOutlineText(outlineName);
+    if (!found) {
+      alert("Outline not found");
+      return;
+    }
+    const generatedOutline = generate_initial_outline(found, difficulty / 10.0, wordMapping);
+    const outlineObjWithRate: OutlineWithRate = {
+      outline: generatedOutline.outline,
+      dropout_rate: difficulty / 10.0,
+    };
+    setCurrentOutlineObj(outlineObjWithRate);
+    setMode("test");
   }
 
   async function fetchOutlineText(outlineName: string): Promise<string|null> {
-    // Check if it's a public file (ends with .txt)
     if (outlineName.endsWith('.txt')) {
-      // Public outline
       const res = await fetch(`/outlines/${outlineName}`);
       if (res.ok) {
         return await res.text();
       }
       return null;
     } else {
-      // Local outline
       const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
       const found = stored.find(o => o.title === outlineName);
       return found ? found.text : null;
     }
   }
 
-  function handleDone(title: string) {
+  function handleDone() {
     // After adding/editing, refresh outlines
     refreshOutlines();
   }

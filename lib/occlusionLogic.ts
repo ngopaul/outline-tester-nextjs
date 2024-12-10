@@ -1,4 +1,3 @@
-// lib/occlusionLogic.ts
 "use client";
 
 export class Occlusion {
@@ -15,13 +14,9 @@ export class Occlusion {
   constructor(answer: string, hintString: string = "") {
     this.answer = answer;
     this.words_in_answer = this.answer.split(" ");
-    this.hints = hintString ? hintString.split(",").filter(h => h) : [];
-    if (this.hints.length === 0) {
-      this.generated_hints = true;
-      this.hints = this.generateHints(this.answer);
-    } else {
-      this.generated_hints = false;
-    }
+    const hintArr = hintString ? hintString.split(",").filter(h => h) : [];
+    this.hints = hintArr.length === 0 ? this.generateHints(this.answer) : hintArr;
+    this.generated_hints = hintArr.length === 0;
     this.attempts = 0;
     this.hint_counter = -1;
     this.use_as_blank = true;
@@ -31,7 +26,7 @@ export class Occlusion {
 
   private generateHints(answer: string): string[] {
     const words = answer.split(" ");
-    let hints: string[] = [];
+    const hints: string[] = [];
     let idx = 1;
     let adder = 1;
     let incAdderCounter = 0;
@@ -117,7 +112,8 @@ export class OccludedOutline {
     return hash.toString();
   }
 
-  private parseOutline(raw_outline: string) {
+  // Make parseOutline protected or public if needed
+  parseOutline(raw_outline: string) {
     const lines = raw_outline.split('\n').map(line => {
       let i = 0;
       let newLine = line;
@@ -129,12 +125,11 @@ export class OccludedOutline {
     });
     const force_spaced_outline = lines.join('\n');
 
-    let result: (Occlusion|string)[] = [];
+    const result: (Occlusion|string)[] = [];
     const segments = force_spaced_outline.split('{{');
     for (let i = 0; i < segments.length; i++) {
-      let part = segments[i].split('}}');
+      const part = segments[i].split('}}');
       if (part.length === 1) {
-        // no occlusion
         result.push(part[0]);
       } else {
         const occlusionPart = part[0].split('|');
@@ -160,11 +155,9 @@ export class OccludedOutline {
         if (avoid_words.includes(answerLower) && dropout_rate < 1) {
           item.use_as_blank = false;
         } else {
-          // frequency-based logic
-          // find least frequent word in the occlusion
           let lowest_word_mapping = 1/2; 
-          for (let w of item.answer.split(" ")) {
-            w = w.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
+          for (const originalWord of item.answer.split(" ")) {
+            let w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
             if (wordMapping[w] !== undefined && wordMapping[w] < lowest_word_mapping) {
               lowest_word_mapping = wordMapping[w];
             } else if (wordMapping[w] === undefined) {
@@ -174,8 +167,7 @@ export class OccludedOutline {
             }
           }
 
-          let temp_dropout_rate = dropout_rate * (1 - lowest_word_mapping) ** 5;
-          temp_dropout_rate = dropout_rate * dropout_rate + temp_dropout_rate * (1 - dropout_rate);
+          const temp_dropout_rate = dropout_rate * dropout_rate + (dropout_rate * (1 - lowest_word_mapping) ** 5) * (1 - dropout_rate);
           if (Math.random() > temp_dropout_rate) {
             item.use_as_blank = false;
           }
@@ -184,7 +176,7 @@ export class OccludedOutline {
     }
     this.original_use_as_blanks = this.outline
       .filter(x => x instanceof Occlusion)
-      .map((x: Occlusion| string) => x instanceof Occlusion ? x.use_as_blank : false);
+      .map(x => x instanceof Occlusion ? x.use_as_blank : false);
     this.combine_consecutive_occlusions();
   }
 
@@ -203,7 +195,7 @@ export class OccludedOutline {
 
   combine_consecutive_occlusions() {
     while (this.has_consecutive_occlusions()) {
-      let new_outline: (Occlusion|string)[] = [];
+      const new_outline: (Occlusion|string)[] = [];
       let i = 0;
       while (i < this.outline.length - 2) {
         const a = this.outline[i];
@@ -239,18 +231,18 @@ export function generate_initial_outline(rawText: string, dropout_rate: number, 
 }
 
 export function calculate_new_dropout_rate(dropout_rate: number, num_attempts: number, num_skipped: number, num_blanks: number, num_hints: number) {
-  if (num_blanks === 0) num_blanks = 1;
+  let tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
   let denominator = 0;
-  const denom_denom = num_blanks - num_skipped;
+  const denom_denom = tempNumBlanks - num_skipped;
   if (denom_denom !== 0) {
     denominator = (num_attempts + num_skipped * num_attempts / denom_denom + num_hints);
   }
   const breakeven_point = 1 - 1/Math.E;
-  let overall_score = denominator === 0 ? breakeven_point : num_blanks / denominator;
-  let scaling_factor = 1 / breakeven_point;
-  let normalized_score = overall_score * scaling_factor;
-  let additional_scaler = 0.75 + (1 - dropout_rate);
-  dropout_rate = (dropout_rate * normalized_score - dropout_rate) * additional_scaler + dropout_rate;
-  dropout_rate = Math.min(Math.max(dropout_rate, 0), 1);
-  return dropout_rate;
+  const overall_score = denominator === 0 ? breakeven_point : tempNumBlanks / denominator;
+  const scaling_factor = 1 / breakeven_point;
+  const normalized_score = overall_score * scaling_factor;
+  const additional_scaler = 0.75 + (1 - dropout_rate);
+  let new_rate = (dropout_rate * normalized_score - dropout_rate) * additional_scaler + dropout_rate;
+  new_rate = Math.min(Math.max(new_rate, 0), 1);
+  return new_rate;
 }

@@ -1,11 +1,10 @@
-// components/OutlineSelector.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface OutlineSelectorProps {
   onSelect: (outlineName: string, difficulty: number) => void;
-  outlines: string[]; // now we pass the outlines list as a prop
+  outlines: string[];
 }
 
 export default function OutlineSelector({ onSelect, outlines }: OutlineSelectorProps) {
