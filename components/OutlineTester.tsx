@@ -109,9 +109,9 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   }
 
   return (
-    <div className="relative">
-      {/* Outline content area with bottom padding to accommodate the fixed input area */}
-      <div className="mb-24 whitespace-pre-wrap font-mono">
+    <div className="flex flex-col h-screen">
+      {/* Scrollable content area */}
+      <div className="overflow-auto flex-1 whitespace-pre-wrap font-mono p-4">
         {outlineObj.outline.map((item, idx) => {
           if (typeof item === 'string') {
             return <span key={idx} dangerouslySetInnerHTML={{ __html: item }} />;
@@ -126,8 +126,8 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
         })}
       </div>
 
-      {/* Fixed input area at bottom */}
-      <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-2 z-50">
+      {/* Sticky bottom input panel */}
+      <div className="bg-white border-t border-gray-200 p-2 sticky bottom-0 z-50">
         {message && <div className="text-blue-700 mb-1">{message}</div>}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <input 
