@@ -1,4 +1,3 @@
-// components/OutlineTester.tsx
 "use client";
 
 import React, { useState, useEffect, KeyboardEvent } from 'react';
@@ -109,9 +108,9 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Scrollable content area */}
-      <div className="overflow-auto flex-1 whitespace-pre-wrap font-mono p-4">
+    <div className="relative h-screen overflow-hidden">
+      {/* The scrollable content area */}
+      <div className="overflow-auto h-full pb-24 p-4 font-mono whitespace-pre-wrap">
         {outlineObj.outline.map((item, idx) => {
           if (typeof item === 'string') {
             return <span key={idx} dangerouslySetInnerHTML={{ __html: item }} />;
@@ -126,8 +125,11 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
         })}
       </div>
 
-      {/* Sticky bottom input panel */}
-      <div className="bg-white border-t border-gray-200 p-2 sticky bottom-0 z-50">
+      {/* Fixed input panel with safe-area padding */}
+      <div 
+        className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-2 z-50"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         {message && <div className="text-blue-700 mb-1">{message}</div>}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <input 
