@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, KeyboardEvent } from 'react';
+import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import { Occlusion, calculate_new_dropout_rate } from '../lib/occlusionLogic';
 
 interface OutlineTesterProps {
@@ -24,10 +24,35 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   const [message, setMessage] = useState("");
   const [guess, setGuess] = useState("");
 
+  // State to track keyboard offset using visualViewport
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const blanks = outlineObj.outline.filter(x => x instanceof Occlusion && x.use_as_blank) as Occlusion[];
     setOcclusions(blanks);
   }, [outlineObj]);
+
+  // Handle keyboard offset using visualViewport API
+  useEffect(() => {
+    function updateOffset() {
+      if (window.visualViewport) {
+        const offset = window.innerHeight - window.visualViewport.height;
+        setKeyboardOffset(offset > 0 ? offset : 0);
+      }
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateOffset);
+      updateOffset();
+      return () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', updateOffset);
+        }
+      };
+    }
+  }, []);
 
   if (!occlusions.length) {
     return <div className="text-sm text-gray-600">No blanks to guess. Check difficulty or outline content.</div>;
@@ -46,6 +71,8 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
     } else {
       handleGuess(input);
     }
+    // Refocus the input after the action
+    inputRef.current?.focus();
   }
 
   function handleGuess(input: string) {
@@ -125,10 +152,10 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
         })}
       </div>
 
-      {/* Fixed input panel with safe-area padding */}
+      {/* Fixed input panel with dynamic offset */}
       <div 
         className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-2 z-50"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{ transform: `translateY(-${keyboardOffset}px)` }}
       >
         {message && <div className="text-blue-700 mb-1">{message}</div>}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -137,6 +164,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
             value={guess} 
             onChange={(e) => setGuess(e.target.value)} 
             onKeyDown={handleKeyDown}
+            ref={inputRef}
             placeholder="Type guess, 'hint', 'skip', or 'quit'..." 
           />
           <div className="flex gap-2">
@@ -148,19 +176,19 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
             </button>
             <button 
               className="px-3 py-1 bg-yellow-500 text-white rounded"
-              onClick={handleHint}
+              onClick={() => { handleHint(); inputRef.current?.focus(); }}
             >
               Hint
             </button>
             <button 
               className="px-3 py-1 bg-gray-500 text-white rounded"
-              onClick={handleSkip}
+              onClick={() => { handleSkip(); inputRef.current?.focus(); }}
             >
               Skip
             </button>
             <button 
               className="px-3 py-1 bg-red-500 text-white rounded"
-              onClick={handleQuit}
+              onClick={() => { handleQuit(); inputRef.current?.focus(); }}
             >
               Quit
             </button>
