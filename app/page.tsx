@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import OutlineSelector from '../components/OutlineSelector';
 import OutlineEditor from '../components/OutlineEditor';
-import { generate_initial_outline, OccludedOutline, calculate_new_dropout_rate } from '../lib/occlusionLogic';
+import { generate_initial_outline, OccludedOutline } from '../lib/occlusionLogic';
 import OutlineTester from '../components/OutlineTester';
 
 interface OutlineData {

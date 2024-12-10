@@ -157,7 +157,7 @@ export class OccludedOutline {
         } else {
           let lowest_word_mapping = 1/2; 
           for (const originalWord of item.answer.split(" ")) {
-            let w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
+            const w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
             if (wordMapping[w] !== undefined && wordMapping[w] < lowest_word_mapping) {
               lowest_word_mapping = wordMapping[w];
             } else if (wordMapping[w] === undefined) {
@@ -231,7 +231,7 @@ export function generate_initial_outline(rawText: string, dropout_rate: number, 
 }
 
 export function calculate_new_dropout_rate(dropout_rate: number, num_attempts: number, num_skipped: number, num_blanks: number, num_hints: number) {
-  let tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
+  const tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
   let denominator = 0;
   const denom_denom = tempNumBlanks - num_skipped;
   if (denom_denom !== 0) {
