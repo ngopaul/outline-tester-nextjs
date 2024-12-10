@@ -1,3 +1,4 @@
+// components/OutlineTester.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, KeyboardEvent } from 'react';
@@ -24,22 +25,26 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   const [message, setMessage] = useState("");
   const [guess, setGuess] = useState("");
 
-  // State to track keyboard offset using visualViewport
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-
   const inputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const blanks = outlineObj.outline.filter(x => x instanceof Occlusion && x.use_as_blank) as Occlusion[];
     setOcclusions(blanks);
   }, [outlineObj]);
 
-  // Handle keyboard offset using visualViewport API
+  // Adjust position based on visualViewport changes
   useEffect(() => {
     function updateOffset() {
       if (window.visualViewport) {
         const offset = window.innerHeight - window.visualViewport.height;
         setKeyboardOffset(offset > 0 ? offset : 0);
+
+        // Optionally scroll the content to ensure the bottom panel is visible
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
       }
     }
 
@@ -71,7 +76,6 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
     } else {
       handleGuess(input);
     }
-    // Refocus the input after the action
     inputRef.current?.focus();
   }
 
@@ -94,13 +98,9 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
 
   function handleHint() {
     const moreHints = currentOcclusion.increase_hint();
-    if (moreHints) {
-      setMessage("Hint given!");
-    } else {
-      setMessage("No more hints available.");
-    }
+    setMessage(moreHints ? "Hint given!" : "No more hints available.");
     setGuess("");
-    setOcclusions([...occlusions]); // re-render to show updated hint
+    setOcclusions([...occlusions]);
   }
 
   function handleSkip() {
@@ -135,9 +135,11 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   }
 
   return (
-    <div className="relative h-screen overflow-hidden">
-      {/* The scrollable content area */}
-      <div className="overflow-auto h-full pb-24 p-4 font-mono whitespace-pre-wrap">
+    <div className="relative" style={{ height: '100dvh' }}>
+      <div 
+        className="overflow-auto h-full p-4 font-mono whitespace-pre-wrap"
+        ref={contentRef}
+      >
         {outlineObj.outline.map((item, idx) => {
           if (typeof item === 'string') {
             return <span key={idx} dangerouslySetInnerHTML={{ __html: item }} />;
@@ -152,7 +154,6 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
         })}
       </div>
 
-      {/* Fixed input panel with dynamic offset */}
       <div 
         className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-2 z-50"
         style={{ transform: `translateY(-${keyboardOffset}px)` }}
@@ -165,31 +166,19 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
             onChange={(e) => setGuess(e.target.value)} 
             onKeyDown={handleKeyDown}
             ref={inputRef}
-            placeholder="Type guess, 'hint', 'skip', or 'quit'..." 
+            placeholder="Type guess, 'hint', 'skip', or 'quit'..."
           />
           <div className="flex gap-2">
-            <button 
-              className="px-3 py-1 bg-green-600 text-white rounded"
-              onClick={() => handleGuessAction(guess)}
-            >
+            <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={() => handleGuessAction(guess)}>
               Guess
             </button>
-            <button 
-              className="px-3 py-1 bg-yellow-500 text-white rounded"
-              onClick={() => { handleHint(); inputRef.current?.focus(); }}
-            >
+            <button className="px-3 py-1 bg-yellow-500 text-white rounded" onClick={() => { handleHint(); inputRef.current?.focus(); }}>
               Hint
             </button>
-            <button 
-              className="px-3 py-1 bg-gray-500 text-white rounded"
-              onClick={() => { handleSkip(); inputRef.current?.focus(); }}
-            >
+            <button className="px-3 py-1 bg-gray-500 text-white rounded" onClick={() => { handleSkip(); inputRef.current?.focus(); }}>
               Skip
             </button>
-            <button 
-              className="px-3 py-1 bg-red-500 text-white rounded"
-              onClick={() => { handleQuit(); inputRef.current?.focus(); }}
-            >
+            <button className="px-3 py-1 bg-red-500 text-white rounded" onClick={() => { handleQuit(); inputRef.current?.focus(); }}>
               Quit
             </button>
           </div>

@@ -114,14 +114,13 @@ export default function Home() {
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Outline Memorization Tool</h1>
       {mode === "select" && (
         <div>
           <OutlineSelector onSelect={handleSelect} outlines={combinedOutlines} />
           <OutlineEditor onDone={handleDone} refreshOutlines={refreshOutlines} />
         </div>
       )}
-      {mode === "test" && currentOutlineObj && (
+      {(mode === "results" || mode === "test") && currentOutlineObj && (
         <OutlineTester outlineObj={currentOutlineObj} onDone={handleTestFinish} onQuit={handleQuit} />
       )}
       {mode === "results" && results && (
@@ -138,6 +137,8 @@ export default function Home() {
           </button>
         </div>
       )}
+      <div className="mt-4 pb-24"></div>
+      <div className="mt-4 pb-24"></div>
     </div>
   );
 }
