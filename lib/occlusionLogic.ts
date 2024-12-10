@@ -46,10 +46,21 @@ export class Occlusion {
     return hints;
   }
 
-  guess(guessStr: string, ignore_case=true, ignore_whitespace=true) {
+  guess(guessStr: string, ignore_case = true, ignore_whitespace = true) {
+    // Helper function to normalize quotes and other characters
+    function normalizeQuotes(str: string): string {
+      return str
+        // Replace various forms of single quotes with a standard single quote
+        .replace(/[‘’‚‛`´]/g, "'")
+        // Replace various forms of double quotes with a standard double quote
+        .replace(/[“”„‟″]/g, '"');
+    }
+  
     this.attempts += 1;
-    let correctAns = this.answer;
-    let userAns = guessStr;
+  
+    let correctAns = normalizeQuotes(this.answer);
+    let userAns = normalizeQuotes(guessStr);
+  
     if (ignore_case) {
       correctAns = correctAns.toLowerCase();
       userAns = userAns.toLowerCase();
@@ -58,10 +69,12 @@ export class Occlusion {
       correctAns = correctAns.trim();
       userAns = userAns.trim();
     }
+  
     if (userAns === correctAns) {
       this.guessed_correctly = true;
       return true;
     }
+  
     return false;
   }
 
