@@ -29,6 +29,7 @@ export default function Home() {
 
   const [combinedOutlines, setCombinedOutlines] = useState<string[]>([]);
   const [wordMapping, setWordMapping] = useState<Record<string, number>>({});
+  const [editingOutline, setEditingOutline] = useState<{title: string; text: string} | null>(null);
 
   function refreshOutlines() {
     Promise.all([
@@ -93,6 +94,7 @@ export default function Home() {
 
   function handleDone() {
     // After adding/editing, refresh outlines
+    setEditingOutline(null);
     refreshOutlines();
   }
 
@@ -112,12 +114,50 @@ export default function Home() {
     setCurrentOutlineObj(null);
   }
 
+  async function handleDelete(outlineName: string) {
+    if (!outlineName) {
+      alert("No outline selected.");
+      return;
+    }
+    if (outlineName.endsWith('.txt')) {
+      alert("Cannot delete public outline.");
+      return;
+    }
+    const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
+    const filtered = stored.filter(o => o.title !== outlineName);
+    localStorage.setItem("customOutlines", JSON.stringify(filtered));
+    refreshOutlines();
+  }
+
+  async function handleEdit(outlineName: string) {
+    if (!outlineName) {
+      alert("No outline selected.");
+      return;
+    }
+    if (outlineName.endsWith('.txt')) {
+      alert("Cannot edit public outline.");
+      return;
+    }
+    const stored: OutlineData[] = JSON.parse(localStorage.getItem("customOutlines") || "[]");
+    const found = stored.find(o => o.title === outlineName);
+    if (!found) {
+      alert("Outline not found in local storage.");
+      return;
+    }
+    setEditingOutline({title: found.title, text: found.text});
+  }
+
   return (
     <div className="p-4 max-w-2xl mx-auto">
       {mode === "select" && (
         <div>
-          <OutlineSelector onSelect={handleSelect} outlines={combinedOutlines} />
-          <OutlineEditor onDone={handleDone} refreshOutlines={refreshOutlines} />
+          <OutlineSelector 
+            onSelect={handleSelect} 
+            outlines={combinedOutlines} 
+            onDelete={handleDelete} 
+            onEdit={handleEdit}
+          />
+          <OutlineEditor onDone={handleDone} refreshOutlines={refreshOutlines} initialTitle={editingOutline?.title} initialText={editingOutline?.text}/>
         </div>
       )}
       {(mode === "results" || mode === "test") && currentOutlineObj && (

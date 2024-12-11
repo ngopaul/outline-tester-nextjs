@@ -1,20 +1,30 @@
-// components/OutlineEditor.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface OutlineEditorProps {
   onDone?: (title: string) => void;
-  refreshOutlines: () => void; // added to refresh outlines after save
+  refreshOutlines: () => void; 
+  initialTitle?: string;
+  initialText?: string;
 }
 
-export default function OutlineEditor({ onDone, refreshOutlines }: OutlineEditorProps) {
-  const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
+export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, initialText }: OutlineEditorProps) {
+  const [title, setTitle] = useState(initialTitle || "");
+  const [text, setText] = useState(initialText || "");
   const [savedMessage, setSavedMessage] = useState("");
 
+  useEffect(() => {
+    // If initialTitle or initialText changes, update state
+    setTitle(initialTitle || "");
+    setText(initialText || "");
+  }, [initialTitle, initialText]);
+
   function saveOutline() {
-    if (!title || !text) return;
+    if (!title || !text) {
+      alert("Please provide both title and text.");
+      return;
+    }
     const stored = JSON.parse(localStorage.getItem("customOutlines") || "[]");
     const filtered = stored.filter((o: {title: string; text: string}) => o.title !== title);
     filtered.push({title, text});
@@ -38,7 +48,7 @@ export default function OutlineEditor({ onDone, refreshOutlines }: OutlineEditor
       />
       <textarea
         className="border p-2 mb-2 w-full"
-        placeholder="Paste outline text here. Words within {{ }} are considered testable words. Otherwise, they will not be tested."
+        placeholder="Paste outline text here..."
         value={text}
         onChange={(e)=>setText(e.target.value)}
         rows={10}

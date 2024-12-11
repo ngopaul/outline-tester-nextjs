@@ -166,7 +166,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   }
 
   return (
-    <div className="relative" style={{ height: '100dvh' }}>
+    <div className="relative">
       <div className="overflow-auto h-full p-4 font-mono whitespace-pre-wrap" ref={contentRef}>
         {outlineObj.outline.map((item, idx) => {
           if (typeof item === 'string') {
