@@ -19,7 +19,7 @@ interface OutlineTesterProps {
 }
 
 export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTesterProps) {
-  const [occlusions, setOcclusions] = useState<Occlusion[]>([]);
+  const [occlusions, setOcclusions] = useState<Occlusion[] | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [message, setMessage] = useState("");
   const [guess, setGuess] = useState("");
@@ -29,23 +29,26 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Compute occlusions based on the outline
     const blanks = outlineObj.outline.filter(x => x instanceof Occlusion && x.use_as_blank) as Occlusion[];
     setOcclusions(blanks);
   }, [outlineObj]);
 
-  // If no blanks are found, treat it as a completed test immediately.
   useEffect(() => {
-    if (occlusions.length === 0 && outlineObj.outline.length > 0) {
-      finishTest(); // immediately show results with all zeros
+    // Only run this after occlusions are computed (not null)
+    if (occlusions !== null) {
+      // If no blanks, treat as completed test immediately
+      if (occlusions.length === 0 && outlineObj.outline.length > 0) {
+        finishTest();
+      }
     }
-  }, [occlusions, outlineObj.outline.length]); 
+  }, [occlusions, outlineObj.outline.length]);
 
   useEffect(() => {
     function updateOffset() {
       if (window.visualViewport) {
         const offset = window.innerHeight - window.visualViewport.height;
         setKeyboardOffset(offset > 0 ? offset : 0);
-        // Optionally scroll the content to the bottom
         if (contentRef.current) {
           contentRef.current.scrollTop = contentRef.current.scrollHeight;
         }
@@ -63,6 +66,24 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
     }
   }, []);
 
+  if (occlusions === null) {
+    // Occlusions not computed yet - just show loading or the outline
+    return (
+      <div className="relative" style={{ height: '100dvh' }}>
+        <div className="overflow-auto h-full p-4 font-mono whitespace-pre-wrap" ref={contentRef}>
+          {outlineObj.outline.map((item, idx) => {
+            if (typeof item === 'string') {
+              return <span key={idx} dangerouslySetInnerHTML={{ __html: item }} />;
+            } else {
+              return <span key={idx}>{item.get_display_value()}</span>;
+            }
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // If we got here, occlusions is not null
   const currentOcclusion = occlusions[currentIndex];
 
   function handleGuessAction(input: string) {
@@ -81,6 +102,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
 
   function handleGuess(input: string) {
     if (!input.trim()) return;
+    if (!occlusions) return;
     const correct = currentOcclusion.guess(input);
     if (correct) {
       setMessage("Correct!");
@@ -100,6 +122,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
     const moreHints = currentOcclusion.increase_hint();
     setMessage(moreHints ? "Hint given!" : "No more hints available.");
     setGuess("");
+    if (!occlusions) return;
     setOcclusions([...occlusions]);
   }
 
@@ -107,6 +130,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
     currentOcclusion.skip();
     setMessage("Skipped.");
     setGuess("");
+    if (!occlusions) return;
     if (currentIndex + 1 < occlusions.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -120,6 +144,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
   }
 
   function finishTest() {
+    if (!occlusions) return;
     const num_blanks = occlusions.length;
     const num_attempts = occlusions.reduce((a, b) => a + b.attempts, 0);
     const num_skipped = occlusions.filter(o => o.skipped).length;
@@ -142,11 +167,7 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
 
   return (
     <div className="relative" style={{ height: '100dvh' }}>
-      <div 
-        className="overflow-auto h-full p-4 font-mono whitespace-pre-wrap"
-        ref={contentRef}
-      >
-        {/* Show the full outline regardless of blanks */}
+      <div className="overflow-auto h-full p-4 font-mono whitespace-pre-wrap" ref={contentRef}>
         {outlineObj.outline.map((item, idx) => {
           if (typeof item === 'string') {
             return <span key={idx} dangerouslySetInnerHTML={{ __html: item }} />;
@@ -161,7 +182,6 @@ export default function OutlineTester({ outlineObj, onDone, onQuit }: OutlineTes
         })}
       </div>
 
-      {/* Only show the input panel if there were blanks initially and not finished yet */}
       {(occlusions.length > 0 && currentIndex < occlusions.length) && (
         <div 
           className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-2 z-50"
