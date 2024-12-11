@@ -87,7 +87,7 @@ export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, i
       <textarea
         ref={textAreaRef}
         className="border p-2 mb-2 w-full"
-        placeholder="Paste outline text here..."
+        placeholder="Put outline text here. Only words wrapped with double curly braces ({{word}}) will be tested."
         value={text}
         onChange={(e)=>setText(e.target.value)}
         rows={10}
