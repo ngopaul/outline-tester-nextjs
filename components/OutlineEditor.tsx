@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface OutlineEditorProps {
   onDone?: (title: string) => void;
@@ -13,6 +13,7 @@ export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, i
   const [title, setTitle] = useState(initialTitle || "");
   const [text, setText] = useState(initialText || "");
   const [savedMessage, setSavedMessage] = useState("");
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     // If initialTitle or initialText changes, update state
@@ -37,6 +38,43 @@ export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, i
     setTimeout(() => setSavedMessage(""), 2000);
   }
 
+  function wrapCurrentWord() {
+    const textarea = textAreaRef.current;
+    if (!textarea) return;
+
+    textarea.focus();
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const fullText = textarea.value;
+
+    // If no selection, use the cursor as both start and end
+    const cursorPos = start === end ? start : end;
+
+    // Find word boundaries
+    let wordStart = cursorPos;
+    while (wordStart > 0 && !/\s/.test(fullText[wordStart - 1])) {
+      wordStart--;
+    }
+
+    let wordEnd = cursorPos;
+    while (wordEnd < fullText.length && !/\s/.test(fullText[wordEnd])) {
+      wordEnd++;
+    }
+
+    const word = fullText.slice(wordStart, wordEnd);
+    const newText = fullText.slice(0, wordStart) + `{{${word}}}` + fullText.slice(wordEnd);
+
+    setText(newText);
+
+    // Position cursor after the inserted }}:
+    const newCursorPos = wordStart + 2 + word.length + 2 + 1; // `{{` + word + `}}  nextword`
+    requestAnimationFrame(() => {
+      textarea.selectionStart = newCursorPos;
+      textarea.selectionEnd = newCursorPos;
+    });
+  }
+
   return (
     <div className="border p-4 rounded bg-gray-50 mt-4">
       <h3 className="font-bold text-lg mb-2">Add/Edit Outline</h3>
@@ -47,12 +85,19 @@ export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, i
         onChange={(e)=>setTitle(e.target.value)} 
       />
       <textarea
+        ref={textAreaRef}
         className="border p-2 mb-2 w-full"
         placeholder="Paste outline text here..."
         value={text}
         onChange={(e)=>setText(e.target.value)}
         rows={10}
       ></textarea>
+      <button
+        className="px-4 py-2 bg-green-600 text-white rounded mr-2"
+        onClick={wrapCurrentWord}
+      >
+        Wrap Word
+      </button>
       <button 
         className="px-4 py-2 bg-blue-600 text-white rounded mr-2"
         onClick={saveOutline}
