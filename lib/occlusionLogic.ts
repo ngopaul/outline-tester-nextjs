@@ -14,9 +14,13 @@ export class Occlusion {
   constructor(answer: string, hintString: string = "") {
     this.answer = answer;
     this.words_in_answer = this.answer.split(" ");
-    const hintArr = hintString ? hintString.split(",").filter(h => h) : [];
-    this.hints = hintArr.length === 0 ? this.generateHints(this.answer) : hintArr;
-    this.generated_hints = hintArr.length === 0;
+    this.hints = hintString ? hintString.split(",").filter(h => h) : [];
+    if (this.hints.length === 0) {
+      this.generated_hints = true;
+      this.hints = this.generateHints(this.answer);
+    } else {
+      this.generated_hints = false;
+    }
     this.attempts = 0;
     this.hint_counter = -1;
     this.use_as_blank = true;
@@ -46,21 +50,10 @@ export class Occlusion {
     return hints;
   }
 
-  guess(guessStr: string, ignore_case = true, ignore_whitespace = true) {
-    // Helper function to normalize quotes and other characters
-    function normalizeQuotes(str: string): string {
-      return str
-        // Replace various forms of single quotes with a standard single quote
-        .replace(/[‘’‚‛`´]/g, "'")
-        // Replace various forms of double quotes with a standard double quote
-        .replace(/[“”„‟″]/g, '"');
-    }
-  
+  guess(guessStr: string, ignore_case=true, ignore_whitespace=true) {
     this.attempts += 1;
-  
-    let correctAns = normalizeQuotes(this.answer);
-    let userAns = normalizeQuotes(guessStr);
-  
+    let correctAns = this.answer;
+    let userAns = guessStr;
     if (ignore_case) {
       correctAns = correctAns.toLowerCase();
       userAns = userAns.toLowerCase();
@@ -69,12 +62,10 @@ export class Occlusion {
       correctAns = correctAns.trim();
       userAns = userAns.trim();
     }
-  
     if (userAns === correctAns) {
       this.guessed_correctly = true;
       return true;
     }
-  
     return false;
   }
 
@@ -125,7 +116,6 @@ export class OccludedOutline {
     return hash.toString();
   }
 
-  // Make parseOutline protected or public if needed
   parseOutline(raw_outline: string) {
     const lines = raw_outline.split('\n').map(line => {
       let i = 0;
@@ -170,7 +160,7 @@ export class OccludedOutline {
         } else {
           let lowest_word_mapping = 1/2; 
           for (const originalWord of item.answer.split(" ")) {
-            const w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
+            let w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
             if (wordMapping[w] !== undefined && wordMapping[w] < lowest_word_mapping) {
               lowest_word_mapping = wordMapping[w];
             } else if (wordMapping[w] === undefined) {
@@ -218,17 +208,16 @@ export class OccludedOutline {
         const c = this.outline[i+2];
         if ((a instanceof Occlusion) && 
             b === " " &&
-            (c instanceof Occlusion)) {
-          const firstOcclusion = a as Occlusion;
-          const secondOcclusion = c as Occlusion;
-          if (firstOcclusion.use_as_blank && secondOcclusion.use_as_blank) {
-            new_outline.push(new Occlusion(a.answer + " " + c.answer, ""));
-            i += 3;
-            continue;
-          }
+            (c instanceof Occlusion) &&
+            a.use_as_blank && c.use_as_blank) {
+          new_outline.push(
+            new Occlusion(a.answer + " " + c.answer, "")
+          );
+          i += 3;
+        } else {
+          new_outline.push(this.outline[i]);
+          i++;
         }
-        new_outline.push(this.outline[i]);
-        i++;
       }
       while (i < this.outline.length) {
         new_outline.push(this.outline[i]);
@@ -237,17 +226,49 @@ export class OccludedOutline {
       this.outline = new_outline;
     }
   }
+
+  // New method to split multi-word occlusions into single-word occlusions
+  splitMultiWordOcclusions() {
+    const new_outline: (Occlusion|string)[] = [];
+    for (const item of this.outline) {
+      if (item instanceof Occlusion) {
+        const words = item.answer.split(" ");
+        if (words.length > 1) {
+          // Split into multiple occlusions
+          for (let w of words) {
+            new_outline.push(new Occlusion(w, ''));
+            // Add a space after each except the last one if next token isn't a newline or another special char
+            // Actually, we do not necessarily need to add spaces here, since original code handles formatting.
+            new_outline.push(" ");
+          }
+          // remove last space added
+          if (new_outline[new_outline.length - 1] === " ") {
+            new_outline.pop();
+          }
+        } else {
+          new_outline.push(item);
+        }
+      } else {
+        new_outline.push(item);
+      }
+    }
+    this.outline = new_outline;
+  }
 }
 
 export function generate_initial_outline(rawText: string, dropout_rate: number, wordMapping: Record<string, number>) {
   const outline = new OccludedOutline(rawText);
+  
+  // Pre-processing step: split multi-word occlusions
+  outline.splitMultiWordOcclusions();
+
   outline.set_blanks(dropout_rate, wordMapping);
   outline.combine_consecutive_occlusions();
   return outline;
 }
 
 export function calculate_new_dropout_rate(dropout_rate: number, num_attempts: number, num_skipped: number, num_blanks: number, num_hints: number) {
-  const tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
+  let tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
   let denominator = 0;
   const denom_denom = tempNumBlanks - num_skipped;
   if (denom_denom !== 0) {

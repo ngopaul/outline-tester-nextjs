@@ -61,6 +61,7 @@ export default function OutlineSelector({ onSelect, outlines, onDelete, onEdit }
           max={10} 
           onChange={(e) => setDifficulty(parseInt(e.target.value) || 0)} 
         />
+        <div className="text-sm text-gray-600">0 for no blanks, 1000 for all blanks</div>
       </div>
       <div className="flex gap-2">
         <button 
