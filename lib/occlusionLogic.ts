@@ -159,11 +159,12 @@ export class OccludedOutline {
           item.use_as_blank = false;
         } else {
           let lowest_word_mapping = 1/2; 
-          for (const originalWord of item.answer.split(" ")) {
-            let w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
-            if (wordMapping[w] !== undefined && wordMapping[w] < lowest_word_mapping) {
+          const allWords = item.answer.split(" ");
+          for (const originalWord of allWords) {
+            const w = originalWord.toLowerCase().replace(/[,\.\?\!;:\(\)\[\]{}]/g, "");
+            if (w in wordMapping && wordMapping[w] < lowest_word_mapping) {
               lowest_word_mapping = wordMapping[w];
-            } else if (wordMapping[w] === undefined) {
+            } else if (!(w in wordMapping)) {
               // If word not in the list, treat as very frequent (0)
               lowest_word_mapping = 0;
               break;
@@ -227,26 +228,65 @@ export class OccludedOutline {
     }
   }
 
-  // New method to split multi-word occlusions into single-word occlusions
+  // Split multi-word occlusions into single-word occlusions,
+  // keeping punctuation as separate string tokens around the words.
   splitMultiWordOcclusions() {
     const new_outline: (Occlusion|string)[] = [];
     for (const item of this.outline) {
       if (item instanceof Occlusion) {
         const words = item.answer.split(" ");
         if (words.length > 1) {
-          // Split into multiple occlusions
-          for (let w of words) {
-            new_outline.push(new Occlusion(w, ''));
-            // Add a space after each except the last one if next token isn't a newline or another special char
-            // Actually, we do not necessarily need to add spaces here, since original code handles formatting.
+          for (const originalW of words) {
+            // Extract leading punctuation
+            const leadingMatch = originalW.match(/^[^A-Za-z0-9']+/);
+            const leadingPunc = leadingMatch ? leadingMatch[0] : "";
+            // Extract trailing punctuation
+            const trailingMatch = originalW.match(/[^A-Za-z0-9']+$/);
+            const trailingPunc = trailingMatch ? trailingMatch[0] : "";
+
+            // Extract the core word
+            const coreWord = originalW.slice(leadingPunc.length, originalW.length - trailingPunc.length);
+
+            // Add leading punctuation if any
+            if (leadingPunc) {
+              new_outline.push(leadingPunc);
+            }
+
+            if (coreWord.length > 0) {
+              // Add the word as an Occlusion
+              new_outline.push(new Occlusion(coreWord, ''));
+            }
+
+            // Add trailing punctuation if any
+            if (trailingPunc) {
+              new_outline.push(trailingPunc);
+            }
+
+            // Add a space after each except the last one (if not already punctuation)
             new_outline.push(" ");
           }
-          // remove last space added
+          // remove last space if present
           if (new_outline[new_outline.length - 1] === " ") {
             new_outline.pop();
           }
         } else {
-          new_outline.push(item);
+          // Single word occlusion
+          const originalW = words[0];
+          const leadingMatch = originalW.match(/^[^A-Za-z0-9']+/);
+          const leadingPunc = leadingMatch ? leadingMatch[0] : "";
+          const trailingMatch = originalW.match(/[^A-Za-z0-9']+$/);
+          const trailingPunc = trailingMatch ? trailingMatch[0] : "";
+          const coreWord = originalW.slice(leadingPunc.length, originalW.length - trailingPunc.length);
+
+          if (leadingPunc) {
+            new_outline.push(leadingPunc);
+          }
+          if (coreWord.length > 0) {
+            new_outline.push(new Occlusion(coreWord, ''));
+          }
+          if (trailingPunc) {
+            new_outline.push(trailingPunc);
+          }
         }
       } else {
         new_outline.push(item);
@@ -259,7 +299,7 @@ export class OccludedOutline {
 export function generate_initial_outline(rawText: string, dropout_rate: number, wordMapping: Record<string, number>) {
   const outline = new OccludedOutline(rawText);
   
-  // Pre-processing step: split multi-word occlusions
+  // Pre-processing step: split multi-word occlusions and handle punctuation
   outline.splitMultiWordOcclusions();
 
   outline.set_blanks(dropout_rate, wordMapping);
@@ -268,7 +308,7 @@ export function generate_initial_outline(rawText: string, dropout_rate: number, 
 }
 
 export function calculate_new_dropout_rate(dropout_rate: number, num_attempts: number, num_skipped: number, num_blanks: number, num_hints: number) {
-  let tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
+  const tempNumBlanks = num_blanks === 0 ? 1 : num_blanks;
   let denominator = 0;
   const denom_denom = tempNumBlanks - num_skipped;
   if (denom_denom !== 0) {
