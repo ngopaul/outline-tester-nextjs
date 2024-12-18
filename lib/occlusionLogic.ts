@@ -107,9 +107,9 @@ export class OccludedOutline {
   }
 
   private hashText(text: string) {
-    let hash = 0, i, chr;
-    for (i = 0; i < text.length; i++) {
-      chr   = text.charCodeAt(i);
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const chr = text.charCodeAt(i);
       hash  = ((hash << 5) - hash) + chr;
       hash |= 0;
     }
@@ -228,6 +228,19 @@ export class OccludedOutline {
     }
   }
 
+  // Before splitting multi-word occlusions, replace all whitespace
+  // inside occlusions with a single space.
+  normalizeOcclusionWhitespace() {
+    for (const item of this.outline) {
+      if (item instanceof Occlusion) {
+        // Replace all whitespace including newlines with a single space
+        item.answer = item.answer.replace(/\s+/g, ' ');
+        // Update words_in_answer too
+        item.words_in_answer = item.answer.split(' ');
+      }
+    }
+  }
+
   // Split multi-word occlusions into single-word occlusions,
   // keeping punctuation as separate string tokens around the words.
   splitMultiWordOcclusions() {
@@ -237,32 +250,22 @@ export class OccludedOutline {
         const words = item.answer.split(" ");
         if (words.length > 1) {
           for (const originalW of words) {
-            // Extract leading punctuation
             const leadingMatch = originalW.match(/^[^A-Za-z0-9']+/);
             const leadingPunc = leadingMatch ? leadingMatch[0] : "";
-            // Extract trailing punctuation
             const trailingMatch = originalW.match(/[^A-Za-z0-9']+$/);
             const trailingPunc = trailingMatch ? trailingMatch[0] : "";
-
-            // Extract the core word
             const coreWord = originalW.slice(leadingPunc.length, originalW.length - trailingPunc.length);
 
-            // Add leading punctuation if any
             if (leadingPunc) {
               new_outline.push(leadingPunc);
             }
-
             if (coreWord.length > 0) {
-              // Add the word as an Occlusion
               new_outline.push(new Occlusion(coreWord, ''));
             }
-
-            // Add trailing punctuation if any
             if (trailingPunc) {
               new_outline.push(trailingPunc);
             }
 
-            // Add a space after each except the last one (if not already punctuation)
             new_outline.push(" ");
           }
           // remove last space if present
@@ -270,7 +273,6 @@ export class OccludedOutline {
             new_outline.pop();
           }
         } else {
-          // Single word occlusion
           const originalW = words[0];
           const leadingMatch = originalW.match(/^[^A-Za-z0-9']+/);
           const leadingPunc = leadingMatch ? leadingMatch[0] : "";
@@ -299,7 +301,10 @@ export class OccludedOutline {
 export function generate_initial_outline(rawText: string, dropout_rate: number, wordMapping: Record<string, number>) {
   const outline = new OccludedOutline(rawText);
   
-  // Pre-processing step: split multi-word occlusions and handle punctuation
+  // First normalize all whitespace inside occlusions
+  outline.normalizeOcclusionWhitespace();
+
+  // Then perform the splitting of multi-word occlusions
   outline.splitMultiWordOcclusions();
 
   outline.set_blanks(dropout_rate, wordMapping);
