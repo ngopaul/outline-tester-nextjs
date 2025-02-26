@@ -53,12 +53,12 @@ export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, i
 
     // Find word boundaries
     let wordStart = cursorPos;
-    while (wordStart > 0 && !/\s/.test(fullText[wordStart - 1])) {
+    while (wordStart > 0 && !/\s|[.:]/.test(fullText[wordStart - 1])) {
       wordStart--;
     }
 
     let wordEnd = cursorPos;
-    while (wordEnd < fullText.length && !/\s/.test(fullText[wordEnd])) {
+    while (wordEnd < fullText.length && !/\s|[.:]/.test(fullText[wordEnd])) {
       wordEnd++;
     }
 
