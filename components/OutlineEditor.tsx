@@ -62,13 +62,19 @@ export default function OutlineEditor({ onDone, refreshOutlines, initialTitle, i
       wordEnd++;
     }
 
+    const characterAfterWordIsSpecial = /\.|:|,|;/.test(fullText[wordEnd]);
+
     const word = fullText.slice(wordStart, wordEnd);
     const newText = fullText.slice(0, wordStart) + `{{${word}}}` + fullText.slice(wordEnd);
 
     setText(newText);
 
     // Position cursor after the inserted }}:
-    const newCursorPos = wordStart + 2 + word.length + 2 + 1; // `{{` + word + `}}  nextword`
+    // should move 2 for the `{{`
+    // should move 2 for the `}}`
+    // should move 1 for the space after the `}}`
+    // should move an extra 1 if the character after the word is one of: .,:;
+    const newCursorPos = wordStart + 2 + word.length + 2 + 1 + (characterAfterWordIsSpecial ? 1 : 0);
     requestAnimationFrame(() => {
       textarea.selectionStart = newCursorPos;
       textarea.selectionEnd = newCursorPos;
