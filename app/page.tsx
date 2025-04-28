@@ -31,6 +31,8 @@ export default function Home() {
   const [wordMapping, setWordMapping] = useState<Record<string, number>>({});
   const [editingOutline, setEditingOutline] = useState<{title: string; text: string} | null>(null);
 
+  const [codeInput, setCodeInput] = useState("");
+
   function refreshOutlines() {
     Promise.all([
       fetch('/outlines/outlines.json').then(r => r.json()),
@@ -62,6 +64,55 @@ export default function Home() {
         setWordMapping(mapping);
       });
   }, []);
+
+  async function handleLoadCode() {
+    if (!codeInput) {
+      alert("Please enter a code.");
+      return;
+    }
+    const res = await fetch('/outlineCodes.json');
+    if (!res.ok) {
+      alert("Failed to load codes file.");
+      return;
+    }
+    const mapping: Record<string, string[]> = await res.json();
+    const filenames = mapping[codeInput.toUpperCase()];
+    if (!filenames) {
+      alert("Invalid code.");
+      return;
+    }
+    if (!window.confirm(
+        `This code will add or overwrite these outlines: ${filenames.join(', ')}.\n` +
+        `Any other locally-stored outlines will remain untouched.\nProceed?`
+      )) {
+      return;
+    }
+  
+    // 1. Fetch the new outlines
+    const loaded: OutlineData[] = await Promise.all(
+      filenames.map(async fname => {
+        const r = await fetch(`/outlines/${fname}`);
+        if (!r.ok) throw new Error(`Failed to fetch ${fname}`);
+        const text = await r.text();
+        return { title: fname.replace(/\.txt$/, ''), text };
+      })
+    );
+  
+    // 2. Merge into existing local outlines
+    const existing: OutlineData[] = JSON.parse(
+      localStorage.getItem("customOutlines") || "[]"
+    );
+  
+    const mergedMap = new Map<string, OutlineData>();
+    existing.forEach(o => mergedMap.set(o.title, o));
+    loaded.forEach(o   => mergedMap.set(o.title, o));  // override or add
+  
+    const merged = Array.from(mergedMap.values());
+    localStorage.setItem("customOutlines", JSON.stringify(merged));
+  
+    refreshOutlines();
+    alert("Outlines loaded and merged into your local set.");
+  }
 
   async function handleSelect(outlineName: string, difficulty: number) {
     const found = await fetchOutlineText(outlineName);
@@ -150,15 +201,39 @@ export default function Home() {
   return (
     <div className="p-4 max-w-2xl mx-auto">
       {mode === "select" && (
-        <div>
+        <>
+          {/* existing selector & editor */}
           <OutlineSelector 
             onSelect={handleSelect} 
-            outlines={combinedOutlines} 
-            onDelete={handleDelete} 
+            outlines={combinedOutlines}
+            onDelete={handleDelete}
             onEdit={handleEdit}
           />
-          <OutlineEditor onDone={handleDone} refreshOutlines={refreshOutlines} initialTitle={editingOutline?.title} initialText={editingOutline?.text}/>
-        </div>
+          <OutlineEditor
+            onDone={handleDone}
+            refreshOutlines={refreshOutlines}
+            initialTitle={editingOutline?.title}
+            initialText={editingOutline?.text}
+          />
+          <div className="border p-4 rounded bg-gray-50">
+            <h3 className="font-bold mb-2">Enter Load Code</h3>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="border p-2 flex-grow"
+                placeholder="Enter code (e.g. ABCD)"
+                value={codeInput}
+                onChange={e => setCodeInput(e.target.value)}
+              />
+              <button
+                className="px-4 py-2 bg-indigo-600 text-white rounded"
+                onClick={handleLoadCode}
+              >
+                Load Outlines
+              </button>
+            </div>
+          </div>
+        </>
       )}
       {(mode === "results" || mode === "test") && currentOutlineObj && (
         <OutlineTester outlineObj={currentOutlineObj} onDone={handleTestFinish} onQuit={handleQuit} />
